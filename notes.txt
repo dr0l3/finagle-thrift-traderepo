@@ -5,6 +5,7 @@ Current situation
 Weaknesses of FXTrade API
 - Untestable, need a pluggable repo layer
 - No persistent storage, only Redis
+- Need logging
 
 Steps for trading server
 - Need sample trading data in sql database

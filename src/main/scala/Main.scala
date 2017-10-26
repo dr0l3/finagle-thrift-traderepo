@@ -28,7 +28,7 @@ object Main extends TwitterServer {
 
 
   val b = client.findById("invalidId")
-    .onFailure(e => println(e.getMessage))
+    .onFailure(e => println(e.toString))
     .onSuccess(v => println(v))
 
 
