@@ -31,10 +31,6 @@ class SimpleTradeRepoService(redisClient: RedisClient) extends TradeRepoService[
     value.asInstanceOf[FXTrade]
   }
 
-  /** Notes: Redis is blocking
-    *
-    */
-
 
   override def create(ccypair: String, rate: Double, buyer: String, seller: String) = Future {
     val id = java.util.UUID.randomUUID().toString

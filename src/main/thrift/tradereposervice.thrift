@@ -1,7 +1,3 @@
-namespace java com.twitter.finagle.examples.names.thriftjava
-#@namespace scala com.twitter.finagle.examples.names.thriftscala
-
-
 
 struct FXTrade {
     1: string id

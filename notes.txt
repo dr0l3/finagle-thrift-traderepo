@@ -1,0 +1,14 @@
+Current situation
+- Simple FXTrade API completed
+- Want to port trade server to Scala
+
+Weaknesses of FXTrade API
+- Untestable, need a pluggable repo layer
+- No persistent storage, only Redis
+
+Steps for trading server
+- Need sample trading data in sql database
+- Implement fetch (Pricehistory)
+- Implement tick
+- Implement runSimulation
+- Celebrate
