@@ -19,6 +19,7 @@ libraryDependencies ++= Seq(
   "com.twitter" %% "twitter-server" % "1.14.0",
   "org.apache.opennlp" % "opennlp-tools" % "1.6.0",
   "org.scalatest" %% "scalatest" %"2.2.5" % "test",
+//  "com.github.etaty" %% "rediscala" % "1.8.0",
   "net.debasishg" %% "redisclient" % "3.4"
 )
 

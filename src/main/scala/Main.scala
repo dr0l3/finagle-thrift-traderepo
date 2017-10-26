@@ -1,4 +1,5 @@
 import com.twitter.server.TwitterServer
+import com.twitter.util.{Await, Duration, Future}
 
 object Main extends TwitterServer {
   import com.twitter.finagle.Thrift
@@ -6,7 +7,7 @@ object Main extends TwitterServer {
   import com.twitter.finagle.examples.names.thriftscala._
   import com.redis._
 
-  val port = 9097
+  val port = 9099
   val address = s"localhost:$port"
 
   val service = SimpleTradeRepoService.createWithClient(new RedisClient("localhost", 32768))
@@ -20,14 +21,16 @@ object Main extends TwitterServer {
 
   val client = Thrift.newIface[TradeRepoService.FutureIface](address)
 
-  val insert = client.create("USDEUR", 1.00, "Rune", "HisBank")
-
-  val again = client.findById(insert.get.id)
-
-  val res = again.get.head.equals(insert.get)
-
-  println(res)
-  println("hello")
+  val a = client.create("USDEUR", 1.00, "Rune", "HisBank")
+    .flatMap(inserted => client.findById(inserted.id))
+    .onSuccess(found => println(s"Succesfully inserted and retrieved ${found.toString}"))
+    .onFailure(e => println(e.toString))
 
 
+  val b = client.findById("invalidId")
+    .onFailure(e => println(e.getMessage))
+    .onSuccess(v => println(v))
+
+
+  Thread.sleep(1000)
 }
