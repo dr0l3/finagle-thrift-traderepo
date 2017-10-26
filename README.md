@@ -4,8 +4,9 @@ sbt console
 import com.twitter.finagle.Thrift
 import com.dr0l3.trades.thriftscala._
 import com.twitter.finagle.examples.names.thriftscala._
+import com.redis._
 
-val server = new SimpleTradeRepoService()
+val server = SimpleTradeRepoService.create()
 
 Thrift.serveIface("localhost:9090", server) 
 

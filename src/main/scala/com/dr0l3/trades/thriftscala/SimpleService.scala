@@ -2,12 +2,17 @@ package com.dr0l3.trades.thriftscala
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}
 
+import com.redis.RedisClient
 import com.twitter.finagle.examples.names.thriftscala.{FXTrade, TradeRepoService}
 import com.twitter.util.{Future, Try}
-import com.redis._
+import com.redis.serialization.{Format, Parse}
 
-class SimpleTradeRepoService() extends TradeRepoService[Future] {
+class SimpleTradeRepoService(redisClient: RedisClient) extends TradeRepoService[Future] {
   var trades = List.empty[FXTrade]
+
+  implicit val formatter : PartialFunction[Any,Any] = { case a => serialise(a)}
+  implicit val parser = Parse.apply(deserialise)
+  implicit val format = Format.apply(formatter)
 
   def serialise(value: Any): Array[Byte] = {
     val stream: ByteArrayOutputStream = new ByteArrayOutputStream()
@@ -17,18 +22,17 @@ class SimpleTradeRepoService() extends TradeRepoService[Future] {
     stream.toByteArray
   }
 
-  def deserialise(bytes: Array[Byte]): Any = {
+  def deserialise(bytes: Array[Byte]): FXTrade = {
     val ois = new ObjectInputStream(new ByteArrayInputStream(bytes))
     val value = ois.readObject
     ois.close()
-    value
+    value.asInstanceOf[FXTrade]
   }
 
   override def create(ccypair: String, rate: Double, buyer: String, seller: String) = {
     val id = java.util.UUID.randomUUID().toString
     val newTrade =FXTrade(id,ccypair,rate,buyer,seller)
-//    redisClient.set(newTrade.id,newTrade)
-    trades = newTrade :: trades
+    redisClient.set(newTrade.id, newTrade)
     Future(newTrade)
   }
 
@@ -49,7 +53,8 @@ class SimpleTradeRepoService() extends TradeRepoService[Future] {
   }
 
   override def findById(id: String) = {
-    Future(trades.find(_.id == id).toList)
+    val trade= redisClient.get[FXTrade](id)
+    Future(trade.toList)
   }
 
   override def findByCcyPair(ccypair: String) = {
@@ -68,8 +73,12 @@ class SimpleTradeRepoService() extends TradeRepoService[Future] {
 
 object SimpleTradeRepoService {
   def create(): TradeRepoService[Future] = {
-    val client = new RedisClient("localhost", 6379)
-    new SimpleTradeRepoService()
+    val client = new RedisClient("localhost", 32768)
+    new SimpleTradeRepoService(client)
+  }
+
+  def createWithClient(redisClient: RedisClient): TradeRepoService[Future] = {
+    new SimpleTradeRepoService(redisClient)
   }
 }
 

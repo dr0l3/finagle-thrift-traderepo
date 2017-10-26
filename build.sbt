@@ -21,3 +21,6 @@ libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" %"2.2.5" % "test",
   "net.debasishg" %% "redisclient" % "3.4"
 )
+
+
+mainClass := Some("Main")
