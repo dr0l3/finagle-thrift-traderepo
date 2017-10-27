@@ -3,11 +3,11 @@ package com.dr0l3.trades.thriftscala
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}
 
 import com.redis.RedisClient
-import com.twitter.finagle.examples.names.thriftscala._
 import com.twitter.util.{Future, Try}
 import com.redis.serialization.{Format, Parse}
+import thrift._
 
-class SimpleTradeRepoService(redisClient: RedisClient) extends TradeRepoService[Future] {
+class SimpleTradeRepoService(db: DB) extends TradeService[Future] {
   var trades = List.empty[FXTrade]
 
   implicit val formatter: PartialFunction[Any, Any] = {
@@ -32,23 +32,28 @@ class SimpleTradeRepoService(redisClient: RedisClient) extends TradeRepoService[
   }
 
 
-  override def create(ccypair: String, rate: Double, buyer: String, seller: String) = Future {
+  override def create(ccypair: String, rate: Double, buyer: TradingEntity, seller: TradingEntity) = Future {
     val id = java.util.UUID.randomUUID().toString
     val newTrade = FXTrade(id, ccypair, rate, buyer, seller)
-    val res = redisClient.set(newTrade.id, newTrade)
-    if (res) newTrade else throw MyCustomException(s"Unable to write value ${newTrade.toString}")
+    val sellerCount = db.findById(newTrade.seller.id).map(_.counter)
+    val buyerCount = db.findById(newTrade.buyer.id).map(_.counter)
+    if (buyerCount.getOrElse(0) >= newTrade.buyer.counter) {
+      throw AppException("Buyer count lower than last seen")
+    } else if (sellerCount.getOrElse(0) >= newTrade.seller.counter) {
+      throw AppException("Seller count lower than last seen")
+    } else {
+      db.increment(newTrade.buyer)
+      db.increment(newTrade.seller)
+      db.insert(newTrade).getOrElse(throw AppException("Error while inserting trade"))
+    }
   }
 
   override def update(updated: FXTrade) = Future {
-    val res = redisClient.set(updated.id, updated)
-    if (res) updated else throw MyCustomException(s"Unable to write value ${updated.toString}")
+    db.update(updated)
   }
 
   override def deleteById(id: String) = Future {
-    redisClient.del(id).map(count => {
-      val current = redisClient.get(id).get
-      if (count < 1) current else throw MyCustomException(s"No value found with $id")
-    }).getOrElse(throw RedisException("Error while connecting to redis"))
+   db.deleteById(id).getOrElse(throw NotFoundException(s"trade with id $id not found"))
   }
 
   override def delete(todelete: FXTrade) = {
@@ -56,8 +61,7 @@ class SimpleTradeRepoService(redisClient: RedisClient) extends TradeRepoService[
   }
 
   override def findById(id: String) = Future {
-    redisClient.get[FXTrade](id)
-      .getOrElse(throw MyCustomException(s"No value found with $id"))
+    db.get(id).getOrElse(throw NotFoundException(s"trade with id $id not found"))
   }
 
   //  override def findByCcyPair(ccypair: String) = {
@@ -71,16 +75,26 @@ class SimpleTradeRepoService(redisClient: RedisClient) extends TradeRepoService[
   //  override def findBySeller(seller: String) = {
   //    Future(trades.filter(t => t.seller == seller))
   //  }
+  override def findByName(name: String) = Future {
+    db.findById(name).getOrElse(throw NotFoundException(s"Trader with id $name not found"))
+  }
+
+  override def createTrader(name: String): Future[TradingEntity] = Future {
+    if(db.findById(name).isDefined){
+      throw AppException("Name already taken")
+    }
+    db.createTradingEntity(TradingEntity(name,1)).getOrElse(throw AppException("Unable to create trader"))
+  }
 }
 
 object SimpleTradeRepoService {
-  def create(): TradeRepoService[Future] = {
-    val client = new RedisClient("localhost", 32768)
-    new SimpleTradeRepoService(client)
+  def create(): TradeService[Future] = {
+//    val client = new RedisClient("localhost", 32768)
+    new SimpleTradeRepoService(new InMemoryDB)
   }
 
-  def createWithClient(redisClient: RedisClient): TradeRepoService[Future] = {
-    new SimpleTradeRepoService(redisClient)
+  def createWithClient(redisClient: RedisClient): TradeService[Future] = {
+    new SimpleTradeRepoService(new RedisDB(redisClient))
   }
 }
 
